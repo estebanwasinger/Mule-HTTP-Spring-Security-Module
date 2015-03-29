@@ -1,5 +1,5 @@
 
-<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
     xmlns:spring="http://www.springframework.org/schema/beans" version="EE-3.6.1"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns:mule-ss="http://www.mulesoft.org/schema/mule/spring-security"
@@ -12,7 +12,8 @@ http://www.mulesoft.org/schema/mule/spring-security http://www.mulesoft.org/sche
 http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security-3.0.xsd
 http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
-http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd">
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
     <spring:beans>
         <spring:bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
             <spring:property name="driverClassName" value="com.mysql.jdbc.Driver"/>
@@ -37,12 +38,23 @@ http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/ht
   </mule-ss:security-manager>
  
   <http:listener-config name="HTTP_Listener_Configuration" host="localhost" port="8081" doc:name="HTTP Listener Configuration" />
+    <db:mysql-config name="MySQL_Configuration" dataSource-ref="dataSource" doc:name="MySQL Configuration"/>
+    <flow name="springsecurityFlow" processingStrategy="queued-asynchronous">
+        <component class="springsecurity.Test" doc:name="Java"/>
+        <db:insert config-ref="MySQL_Configuration" doc:name="Database">
+            <db:parameterized-query><![CDATA[INSERT INTO `test`.`logs` (`user_id`) VALUES (#[auth]);]]></db:parameterized-query>
+        </db:insert>
+        <logger message="#[auth]" level="INFO" doc:name="Logger"/>
+    </flow>
  
   <flow name="SpringExample">
     <http:listener config-ref="HTTP_Listener_Configuration" path="/" doc:name="HTTP"/>
       <logger level="INFO" message="## received" doc:name="Logger"/>
-        <component class="springsecurity.Test" doc:name="Java"/>
-      <http:basic-security-filter realm="mule-realm"/>      
+      <http:basic-security-filter realm="mule-realm"/>
+        <async doc:name="Async">
+            <flow-ref name="springsecurityFlow" doc:name="springsecuritySub_Flow"/>
+        </async>
+      
     <logger level="INFO" message="## passed security" doc:name="Logger"/>
   </flow>
 </mule>
